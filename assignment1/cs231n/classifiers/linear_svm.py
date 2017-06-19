@@ -24,6 +24,8 @@ def svm_loss_naive(W, X, y, reg):
   - gradient with respect to weights W; an array of same shape as W
   """
   dW = np.zeros(W.shape) # initialize the gradient as zero
+  dWp = np.zeros(W.shape)
+  dWm = np.zeros(W.shape)
   #dW shape: (3073,10)
 
   # compute the loss and the gradient
@@ -41,14 +43,14 @@ def svm_loss_naive(W, X, y, reg):
       margin = scores[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
-        dW[:,j] += X[i]
-        dW[:,y[i]] += -X[i]
+        dWp[:,j] += X[i]
+        dWm[:,y[i]] += -X[i]
         lossv[i,j] = margin
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
-  dW /= num_train
+  dW = (dWp + dWm)/num_train
 
   # Add regularization to the loss.
   loss += reg * np.sum(W * W)
@@ -63,7 +65,7 @@ def svm_loss_naive(W, X, y, reg):
   #############################################################################
 
 
-  return loss, dW, lossv
+  return loss, dW
 
 
 def svm_loss_vectorized(W, X, y, reg):
@@ -84,12 +86,9 @@ def svm_loss_vectorized(W, X, y, reg):
   #x size: (numTrain, 3073)
   #wx: (10, numTrain)
   xw = np.dot(X, W) # shape: (numTrain, 10)
-  s_sum = (xw.T - np.choose(y, xw.T))+1 # the Si,j the array. 
-  #print(wx[0] - np.take(wx, y)[0]) # (500,) array. good. 
-  loss = (((s_sum>0)*s_sum).sum(axis = 0)-1)/X.shape[0]
-  print(loss.shape)
-  dW = np.dot((s_sum>0),X).sum(axis=0)-2*X[y]
-
+  s_sum = (xw.T - np.choose(y, xw.T))+1 # the Si,j the array. shape: (10, numtrain)
+  loss = (((s_sum>0)*s_sum).sum(axis = 0)-1)/X.shape[0] 
+    
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -102,11 +101,18 @@ def svm_loss_vectorized(W, X, y, reg):
   #                                                                           #
   # Hint: Instead of computing the gradient from scratch, it may be easier    #
   # to reuse some of the intermediate values that you used to compute the     #
-  # loss.                                                                     #
+  # loss.                                    loss.sum() + reg * np.sum(W * W)                                 #
   #############################################################################
-  pass
+  numTrain = X.shape[0]
+  dwPlus = np.dot((s_sum>0)-(np.identity(10)[y]).T,X)
+  m = (np.identity(10)[y]) # (10, 5) each entry get added to the correct y[i], out of 10
+  factor = (s_sum>0).sum(axis=0)-1
+  dwMinus = np.dot((m*factor[:, np.newaxis]).T,X)
+  dW = (dwPlus - dwMinus)/numTrain
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
 
-  return loss, dW
+  finalloss = loss.sum() + reg * np.sum(W * W)
+  return finalloss, dW.T
