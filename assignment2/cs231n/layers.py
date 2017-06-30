@@ -25,7 +25,14 @@ def affine_forward(x, w, b):
     # TODO: Implement the affine forward pass. Store the result in out. You   #
     # will need to reshape the input into rows.                               #
     ###########################################################################
-    pass
+    #print("W:", w.shape)
+    #print("x:", x.shape)
+    #print("b: ", b.shape)
+    xReshape =  x.reshape(x.shape[0], -1) #(N, D)
+    #print("xReshape: ", xReshape.shape)
+    out = xReshape.dot(w) + b # (N, D).dot(D, M)
+    #print("out: ", out.shape) # (N, M) i.e., (2, 3)
+    #print(out)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -53,7 +60,13 @@ def affine_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
-    pass
+    # out = Wx + b
+    # dOdw = x x: (N, d1... dx)
+    #print(x.shape)
+    #dw = x.reshape(x.shape[0], -1)
+    dx = dout.dot(w.T).reshape(x.shape)
+    db = dout.sum(axis=0)
+    dw = dout.dot(np.identity(dout.shape[1])).T.dot(x.reshape(x.shape[0], -1)).T
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -75,7 +88,10 @@ def relu_forward(x):
     ###########################################################################
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
-    pass
+    
+    #relu: f(x) = max(0, x)
+    #out = np.maximum(x, np.zeros(x.shape)) #see better option below. 
+    out = np.maximum(0, x)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -98,7 +114,7 @@ def relu_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
-    pass
+    dx = dout*((x>0))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
