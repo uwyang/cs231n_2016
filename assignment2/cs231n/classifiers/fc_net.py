@@ -206,6 +206,14 @@ class FullyConnectedNet(object):
 
             self.params['W' + str(i)] = W
             self.params['b' + str(i)] = b
+            
+            if is_hidden_layer(i, self.num_layers):
+                if self.use_batchnorm:
+                  gamma = np.ones(layer_dims[i])
+                  beta = np.zeros(layer_dims[i])
+
+                  self.params['gamma' + str(i)] = gamma
+                  self.params['beta' + str(i)] = beta
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -244,11 +252,11 @@ class FullyConnectedNet(object):
 
         # Set train/test mode for batchnorm params and dropout param since they
         # behave differently during training and testing.
-        if self.use_dropout:
-            self.dropout_param['mode'] = mode
+        if self.dropout_param is not None:
+          self.dropout_param['mode'] = mode
         if self.use_batchnorm:
-            for bn_param in self.bn_params:
-                bn_param['mode'] = mode
+          for bn_param in self.bn_params:
+            bn_param[mode] = mode
 
         scores = None
         ############################################################################
@@ -265,22 +273,44 @@ class FullyConnectedNet(object):
         ############################################################################
         caches = []
         scores = X.copy()
-        
-        for i in np.arange(1, self.num_layers+1):
-            W = self.params['W' + str(i)]
-            b = self.params['b' + str(i)]
-            scores, c = affine_forward(scores, W, b)
-            caches.append(c)
-        
+
+        for i in np.arange(1, self.num_layers + 1):
+          W = self.params['W' + str(i)]
+          b = self.params['b' + str(i)]
+
+          scores, affine_c = affine_forward(scores, W, b)
+          caches.append(affine_c)
+
+          if is_hidden_layer(i, self.num_layers):
+            
+            if self.use_batchnorm:
+              gamma = self.params['gamma' + str(i)]
+              beta = self.params['beta' + str(i)]
+              bn_p = self.bn_params[i - 1]
+
+              scores, batchnorm_c = batchnorm_forward(scores, gamma, beta, bn_p)
+              caches.append(batchnorm_c)
+
+            scores, relu_cache = relu_forward(scores)
+            caches.append(relu_cache)
+
+            '''
+            if self.use_dropout:
+              scores, dropout_c = dropout_forward(scores, self.dropout_param)
+              caches.append(dropout_c)
+              '''
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
 
         # If test mode return early
         if mode == 'test':
-            return scores
+          return scores
 
         loss, grads = 0.0, {}
+        
+
         ############################################################################
         # TODO: Implement the backward pass for the fully-connected net. Store the #
         # loss in the loss variable and gradients in the grads dictionary. Compute #
@@ -295,18 +325,42 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         loss, dscores = softmax_loss(scores, y)
+        if np.isnan(loss):
+            print("loss is nan")
+        #Sprint(loss)
 
         for i in np.arange(self.num_layers, 0, -1):
-          dscores, dW, db = affine_backward(dscores, caches.pop())
+            if is_hidden_layer(i, self.num_layers):
+                '''
+                if self.use_dropout:
+                  dscores = dropout_backward(dscores, caches.pop())
+                '''
 
-          grads['W' + str(i)] = dW + self.reg * self.params['W' + str(i)]
-          grads['b' + str(i)] = db
+                dscores  = relu_backward(dscores, caches.pop())
 
-          loss += 0.5 * self.reg * np.sum(self.params['W' + str(i)]**2)
-        
-            
+                
+                if self.use_batchnorm:
+                  dscores, dgamma, dbeta = batchnorm_backward_alt(dscores, caches.pop())
+
+                  grads['gamma' + str(i)] = dgamma
+                  grads['beta' + str(i)] = dbeta
+                
+            dscores, dW, db = affine_backward(dscores, caches.pop())
+            grads['W' + str(i)] = dW + self.reg * self.params['W' + str(i)]
+            grads['b' + str(i)] = db
+            loss += 0.5 * self.reg * np.sum(self.params['W' + str(i)]**2)
+            #print("layer " , i , " loss: " , loss)
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
 
         return loss, grads
+    
+def is_hidden_layer(layer, num_layers):
+  """
+  Convenience function that returns whether the current
+  layer is a hidden layer. If not, then it is the output layer
+  """
+  return layer < num_layers
+
